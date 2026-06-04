@@ -1,8 +1,9 @@
 import axios from "axios";
 
 const getApiBaseUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_URL || "https://techmans.me/";
-  return envUrl.endsWith("/api") ? envUrl : `${envUrl}/api`;
+  const envUrl = import.meta.env.VITE_API_URL || "https://techmans.me";
+  const cleanUrl = envUrl.endsWith("/") ? envUrl.slice(0, -1) : envUrl;
+  return cleanUrl.endsWith("/api") ? cleanUrl : `${cleanUrl}/api`;
 };
 
 const API_BASE_URL = getApiBaseUrl();

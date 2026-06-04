@@ -12,7 +12,11 @@ export const getSocket = (): Socket => {
       socket.disconnect();
     }
     currentToken = token;
-    socket = io("https://techmans.me/", {
+    const envUrl = import.meta.env.VITE_API_URL || "https://techmans.me";
+    const cleanUrl = envUrl.endsWith("/") ? envUrl.slice(0, -1) : envUrl;
+    const socketUrl = cleanUrl.endsWith("/api") ? cleanUrl.slice(0, -4) : cleanUrl;
+
+    socket = io(socketUrl, {
       auth: { token },
       transports: ["websocket"],
       reconnection: true,
@@ -25,7 +29,8 @@ export const getSocket = (): Socket => {
         const refreshToken = localStorage.getItem("ww_refresh_token") || localStorage.getItem("refreshToken");
         if (refreshToken) {
           try {
-            const response = await fetch("https://techmans.me//api/auth/refresh", {
+            const refreshUrl = cleanUrl.endsWith("/api") ? `${cleanUrl}/auth/refresh` : `${cleanUrl}/api/auth/refresh`;
+            const response = await fetch(refreshUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ refreshToken })
