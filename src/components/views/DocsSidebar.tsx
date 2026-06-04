@@ -92,7 +92,7 @@ export const DocsSidebar: React.FC = () => {
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;
-    
+
     return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
@@ -129,7 +129,7 @@ export const DocsSidebar: React.FC = () => {
           </div>
         </div>
 
-        <button 
+        <button
           onClick={handleCreateDoc}
           disabled={createDocMutation.isPending}
           style={{
@@ -203,13 +203,13 @@ export const DocsSidebar: React.FC = () => {
             <span style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.35)", fontWeight: "500" }}>No documents yet. Create one to begin!</span>
           </div>
         ) : (
-          <div 
+          <div
             className="custom-scrollbar"
-            style={{ 
-              display: "flex", 
-              flexDirection: "column", 
-              gap: "4px", 
-              maxHeight: "calc(100vh - 210px)", 
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              maxHeight: "calc(100vh - 210px)",
               overflowY: "auto",
               paddingRight: "2px"
             }}
@@ -233,7 +233,6 @@ export const DocsSidebar: React.FC = () => {
                     borderRadius: "10px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    group: "true"
                   }}
                   className="doc-sidebar-item"
                   onMouseEnter={(e) => {
@@ -248,21 +247,21 @@ export const DocsSidebar: React.FC = () => {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden", flex: 1, paddingRight: "8px" }}>
-                    <FileText 
-                      size={15} 
-                      style={{ 
-                        color: isActive ? "hsl(263, 90%, 64%)" : "rgba(255, 255, 255, 0.5)", 
-                        flexShrink: 0 
-                      }} 
+                    <FileText
+                      size={15}
+                      style={{
+                        color: isActive ? "hsl(263, 90%, 64%)" : "rgba(255, 255, 255, 0.5)",
+                        flexShrink: 0
+                      }}
                     />
                     <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                      <span style={{ 
-                        fontSize: "13px", 
-                        fontWeight: isActive ? "600" : "500", 
-                        color: isActive ? "white" : "rgba(255, 255, 255, 0.85)", 
-                        overflow: "hidden", 
-                        textOverflow: "ellipsis", 
-                        whiteSpace: "nowrap" 
+                      <span style={{
+                        fontSize: "13px",
+                        fontWeight: isActive ? "600" : "500",
+                        color: isActive ? "white" : "rgba(255, 255, 255, 0.85)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap"
                       }}>
                         {doc.title || "Untitled"}
                       </span>

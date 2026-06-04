@@ -30,7 +30,7 @@ const ICON_PRESETS = [
 export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
   const queryClient = useQueryClient();
   const { activeWorkspaceId, setActiveSpaceId } = useUIStore();
-  
+
   const [name, setName] = useState("");
   const [selectedColor, setSelectedColor] = useState(COLOR_PRESETS[0]);
   const [selectedIcon, setSelectedIcon] = useState("Folder");
@@ -107,7 +107,7 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
   };
 
   const toggleMember = (userId: string) => {
-    setSelectedMembers(prev => 
+    setSelectedMembers(prev =>
       prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
     );
   };
@@ -128,7 +128,7 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
       zIndex: 999999,
       animation: "fadeIn 0.25s ease-out"
     }}>
-      <div 
+      <div
         className="glass-panel"
         style={{
           width: "480px",
@@ -157,7 +157,7 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
               {spaceId ? "Edit Space settings" : "Create a new Space"}
             </h3>
           </div>
-          <button 
+          <button
             onClick={onClose}
             style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", display: "flex", padding: "4px" }}
           >
@@ -167,11 +167,11 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "20px", overflowY: "auto", maxHeight: "75vh" }}>
-          
+
           {/* Space Name Input */}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <label style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.4)" }}>Space Name</label>
-            <input 
+            <input
               type="text"
               placeholder="e.g. Engineering, Marketing, Operations..."
               value={name}
@@ -256,9 +256,9 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <label style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.4)" }}>Privacy & Access</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              
+
               {/* Public Choice */}
-              <div 
+              <div
                 onClick={() => setIsPrivate(false)}
                 style={{
                   padding: "12px 14px",
@@ -283,7 +283,7 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
               </div>
 
               {/* Private Choice */}
-              <div 
+              <div
                 onClick={() => setIsPrivate(true)}
                 style={{
                   padding: "12px 14px",
@@ -314,11 +314,11 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
           {isPrivate && (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", animation: "slideDown 0.2s ease-out" }}>
               <label style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.4)" }}>Invite Members</label>
-              
+
               {users.length === 0 ? (
                 <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>No other organization users to invite.</span>
               ) : (
-                <div 
+                <div
                   className="custom-scrollbar"
                   style={{
                     display: "flex",
@@ -350,7 +350,7 @@ export const SpaceModal: React.FC<SpaceModalProps> = ({ spaceId, onClose }) => {
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: selectedColor, display: "flex", alignItems: "center", justifyCenter: "center", fontSize: "10px", fontWeight: "700", color: "white" }}>
+                          <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: selectedColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "700", color: "white" }}>
                             {item.fullName.charAt(0).toUpperCase()}
                           </div>
                           <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.85)" }}>{item.fullName}</span>

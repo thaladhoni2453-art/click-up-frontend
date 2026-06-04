@@ -59,10 +59,10 @@ export const BoardView: React.FC = () => {
           {spaceStatuses.map((col: any) => {
             const colTasks = groupedTasks[col.id] || [];
             return (
-              <div 
-                key={col.id} 
-                className="glass-panel" 
-                style={{ width: "300px", minWidth: "300px", maxWeight: "100%", borderRadius: "var(--radius-lg)", border: "1px solid hsl(var(--border-hsl))", padding: "16px", display: "flex", flexDirection: "column", maxHeight: "100%", background: "rgba(10, 12, 18, 0.4)" }}
+              <div
+                key={col.id}
+                className="glass-panel"
+                style={{ width: "300px", minWidth: "300px", maxWidth: "100%", borderRadius: "var(--radius-lg)", border: "1px solid hsl(var(--border-hsl))", padding: "16px", display: "flex", flexDirection: "column", maxHeight: "100%", background: "rgba(10, 12, 18, 0.4)" }}
               >
                 {/* Column header title */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", paddingBottom: "8px", borderBottom: "1px solid hsl(var(--border-hsl))" }}>

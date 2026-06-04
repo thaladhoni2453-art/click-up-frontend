@@ -4,8 +4,8 @@ import { useUIStore } from "../../stores/uiStore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
-import { 
-  Folder, List, Layers, Plus, ChevronRight, ChevronDown, 
+import {
+  Folder, List, Layers, Plus, ChevronRight, ChevronDown,
   Settings, BookOpen, MessageSquare, Target, Calendar, BarChart3, HelpCircle, Inbox, Hash, Users, PlusCircle, Search, Timer, Trash2
 } from "lucide-react";
 
@@ -30,7 +30,7 @@ export const Sidebar: React.FC = () => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [showAddSpace, setShowAddSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
-  
+
   // Section collapsible states
   const [expandedHome, setExpandedHome] = useState(true);
   const [expandedFavorites, setExpandedFavorites] = useState(false);
@@ -76,7 +76,7 @@ export const Sidebar: React.FC = () => {
   // Connect socket and listen for online/offline presence status updates and channel lists changes
   React.useEffect(() => {
     const socket = getSocket();
-    
+
     // Fetch initial list of online users
     socket.emit("get:online-users", (users: string[]) => {
       if (Array.isArray(users)) setOnlineUsers(users);
@@ -153,7 +153,7 @@ export const Sidebar: React.FC = () => {
       const { data } = await api.delete(`/folders/${folderId}`);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, folderId) => {
       queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
       if (uiStore.activeFolderId === folderId) {
         uiStore.setActiveFolderId(null);
@@ -167,7 +167,7 @@ export const Sidebar: React.FC = () => {
       const { data } = await api.delete(`/workspaces/lists/${listId}`);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, listId) => {
       queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
       if (uiStore.activeListId === listId) {
         uiStore.setActiveListId(null);
@@ -181,7 +181,7 @@ export const Sidebar: React.FC = () => {
       const { data } = await api.delete(`/spaces/${spaceId}`);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, spaceId) => {
       queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
       if (uiStore.activeSpaceId === spaceId) {
         uiStore.setActiveSpaceId(null);
@@ -200,28 +200,28 @@ export const Sidebar: React.FC = () => {
   // Helper to extract DM partner
   const getDMPartner = (d: any) => {
     if (!d.isDM) return { fullName: d.name || "Group Chat", email: "", id: "" };
-    
+
     // Find the participant that is not the active user
     const participants = d.participantIds || [];
     const partnerId = d.partnerId || participants.find((id: string) => id !== user?.id) || "mock-member";
-    
+
     // Default fallback name from the backend channels payload
     let fullName = d.name || "Chat Partner";
-    
+
     // Parse description signatures
     const desc = d.description || "";
     const emailMatch = desc.match(/invited\s+([^\s]+)/i);
     let partnerEmail = emailMatch ? emailMatch[1] : "member@wavework.ai";
-    
+
     // Extract inviter email
     const inviterMatch = desc.match(/^([^\s]+)\s+invited/i) || desc.match(/^([^\s]+)\s+has\s+invited/i);
     const inviterEmail = inviterMatch ? inviterMatch[1] : null;
-    
+
     if (inviterEmail && user?.email && inviterEmail !== user.email) {
       // The inviter is the partner! (Current user is the receiver)
       partnerEmail = inviterEmail;
     }
-    
+
     if (fullName.startsWith("dm:") || fullName === "Chat Partner" || fullName === "Member" || fullName === "M Member" || fullName.includes("@")) {
       const emailToParse = fullName.includes("@") ? fullName : partnerEmail;
       const partnerName = emailToParse.split("@")[0];
@@ -238,21 +238,21 @@ export const Sidebar: React.FC = () => {
   const currentWorkspaceName = workspaces.find(w => w.id === activeWorkspaceId)?.name || "My Workspace";
 
   return (
-    <aside 
-      className="glass-panel" 
-      style={{ 
-        width: "244px", 
-        display: "flex", 
-        flexDirection: "column", 
-        height: "100%", 
+    <aside
+      className="glass-panel"
+      style={{
+        width: "244px",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
         borderRight: "1px solid hsl(var(--border-hsl))",
         background: "rgba(15, 16, 22, 0.96)",
       }}
     >
       {/* Workspace Switcher Header (ClickUp layout) */}
-      <div 
-        style={{ 
-          padding: "12px 14px", 
+      <div
+        style={{
+          padding: "12px 14px",
           borderBottom: "1px solid hsl(var(--border-hsl))",
           display: "flex",
           alignItems: "center",
@@ -261,18 +261,18 @@ export const Sidebar: React.FC = () => {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
           {/* Green Workspace Indicator */}
-          <div 
-            style={{ 
-              width: "20px", 
-              height: "20px", 
-              borderRadius: "4px", 
-              background: "hsl(var(--success-hsl))", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              fontWeight: "800", 
-              fontSize: "11px", 
-              color: "white" 
+          <div
+            style={{
+              width: "20px",
+              height: "20px",
+              borderRadius: "4px",
+              background: "hsl(var(--success-hsl))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: "800",
+              fontSize: "11px",
+              color: "white"
             }}
           >
             {currentWorkspaceName.charAt(0).toUpperCase()}
@@ -285,12 +285,12 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Sub-header with "Home" label, Search trigger and purple + Create button */}
-      <div 
-        style={{ 
-          padding: "10px 14px 4px 14px", 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "space-between" 
+      <div
+        style={{
+          padding: "10px 14px 4px 14px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between"
         }}
       >
         <span style={{ fontSize: "14px", fontWeight: "700", color: "white", letterSpacing: "-0.01em" }}>Home</span>
@@ -321,7 +321,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Sidebar Tree Navigation Area */}
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px", display: "flex", flexDirection: "column", gap: "12px" }}>
-        
+
         {/* COLLAPSIBLE HOME HUB */}
         <div style={{ display: "flex", flexDirection: "column" }}>
           <button
@@ -346,23 +346,23 @@ export const Sidebar: React.FC = () => {
               ].map((item) => {
                 const isActive = activeViewId === item.id;
                 return (
-                  <button 
+                  <button
                     key={item.id}
                     onClick={() => {
                       setActiveViewId(item.id);
                     }}
-                    style={{ 
-                      width: "100%", 
-                      display: "flex", 
-                      alignItems: "center", 
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
                       justifyContent: "space-between",
-                      padding: "6px 8px", 
-                      background: isActive ? "rgba(255,255,255,0.06)" : "transparent", 
-                      border: "none", 
-                      borderRadius: "var(--radius-sm)", 
-                      color: isActive ? "white" : "hsl(var(--text-secondary-hsl))", 
-                      cursor: "pointer", 
-                      fontSize: "12.5px" 
+                      padding: "6px 8px",
+                      background: isActive ? "rgba(255,255,255,0.06)" : "transparent",
+                      border: "none",
+                      borderRadius: "var(--radius-sm)",
+                      color: isActive ? "white" : "hsl(var(--text-secondary-hsl))",
+                      cursor: "pointer",
+                      fontSize: "12.5px"
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -372,12 +372,12 @@ export const Sidebar: React.FC = () => {
                       <span style={{ fontWeight: isActive ? "600" : "500" }}>{item.label}</span>
                     </div>
                     {item.badge && (
-                      <span 
-                        style={{ 
-                          fontSize: "10px", 
-                          background: "rgba(255,255,255,0.08)", 
-                          color: "hsl(var(--text-muted-hsl))", 
-                          padding: "1px 5px", 
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          background: "rgba(255,255,255,0.08)",
+                          color: "hsl(var(--text-muted-hsl))",
+                          padding: "1px 5px",
                           borderRadius: "9999px",
                           fontWeight: "700"
                         }}
@@ -403,7 +403,7 @@ export const Sidebar: React.FC = () => {
             </span>
             <span style={{ color: "hsl(var(--text-muted-hsl))" }}>FAVORITES</span>
           </button>
-          
+
           {expandedFavorites && (
             <div style={{ padding: "6px 20px", fontSize: "12px", color: "hsl(var(--text-muted-hsl))", fontStyle: "italic" }}>
               Add to your sidebar
@@ -444,55 +444,55 @@ export const Sidebar: React.FC = () => {
                   const partner = getDMPartner(d);
                   const isOnline = onlineUsers.includes(partner.id);
                   const isActive = activeChannelId === d.id && activeViewId === "chat";
-                  
+
                   return (
-                    <button 
+                    <button
                       key={d.id}
                       onClick={() => {
                         setActiveViewId("chat");
                         setActiveChannelId(d.id);
                       }}
-                      style={{ 
-                        width: "100%", 
-                        display: "flex", 
-                        alignItems: "center", 
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
                         gap: "8px",
-                        padding: "5px 8px", 
-                        background: isActive ? "rgba(255,255,255,0.06)" : "transparent", 
-                        border: "none", 
-                        borderRadius: "var(--radius-sm)", 
-                        color: isActive ? "white" : "hsl(var(--text-secondary-hsl))", 
-                        cursor: "pointer", 
+                        padding: "5px 8px",
+                        background: isActive ? "rgba(255,255,255,0.06)" : "transparent",
+                        border: "none",
+                        borderRadius: "var(--radius-sm)",
+                        color: isActive ? "white" : "hsl(var(--text-secondary-hsl))",
+                        cursor: "pointer",
                         fontSize: "12.5px",
                         textAlign: "left"
                       }}
                     >
                       {/* Live presence indicator dot ring */}
                       <div style={{ position: "relative", display: "inline-block" }}>
-                        <div 
-                          style={{ 
-                            width: "18px", 
-                            height: "18px", 
-                            borderRadius: "50%", 
-                            background: isActive ? "hsl(var(--primary-hsl))" : "rgba(255,255,255,0.1)", 
-                            display: "flex", 
-                            alignItems: "center", 
-                            justifyContent: "center", 
-                            fontSize: "8.5px", 
+                        <div
+                          style={{
+                            width: "18px",
+                            height: "18px",
+                            borderRadius: "50%",
+                            background: isActive ? "hsl(var(--primary-hsl))" : "rgba(255,255,255,0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "8.5px",
                             fontWeight: "bold",
                             color: "white"
                           }}
                         >
                           {(partner.fullName || "U").charAt(0)}
                         </div>
-                        <div 
-                          style={{ 
-                            position: "absolute", 
-                            bottom: "-1px", 
-                            right: "-1px", 
-                            width: "7px", 
-                            height: "7px", 
-                            borderRadius: "50%", 
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: "-1px",
+                            right: "-1px",
+                            width: "7px",
+                            height: "7px",
+                            borderRadius: "50%",
                             background: isOnline ? "hsl(var(--success-hsl))" : "#8E8E93",
                             border: "1px solid rgba(15, 16, 22, 0.96)",
                             boxShadow: isOnline ? "0 0 4px hsl(var(--success-hsl))" : "none"
@@ -512,7 +512,7 @@ export const Sidebar: React.FC = () => {
 
         {/* SPACES HIERARCHY */}
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", justifySpaceBetween: "space-between", paddingRight: "6px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: "6px" }}>
             <button
               onClick={() => setExpandedSpacesSec(!expandedSpacesSec)}
               style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 6px", background: "transparent", border: "none", color: "white", cursor: "pointer", fontSize: "11px", fontWeight: "700", textAlign: "left" }}
@@ -522,12 +522,12 @@ export const Sidebar: React.FC = () => {
               </span>
               <span style={{ color: "hsl(var(--text-muted-hsl))" }}>SPACES</span>
             </button>
-            <Plus 
-              size={11} 
-              style={{ color: "hsl(var(--text-muted-hsl))", cursor: "pointer" }} 
+            <Plus
+              size={11}
+              style={{ color: "hsl(var(--text-muted-hsl))", cursor: "pointer" }}
               onClick={() => {
                 window.dispatchEvent(new CustomEvent("ww:open-space-modal", { detail: null }));
-              }} 
+              }}
             />
           </div>
 
@@ -538,24 +538,24 @@ export const Sidebar: React.FC = () => {
                 return (
                   <div key={space.id} style={{ display: "flex", flexDirection: "column" }}>
                     {/* Space Node Header */}
-                    <div 
+                    <div
                       onClick={() => {
                         setActiveSpaceId(space.id);
                       }}
-                      style={{ 
-                        display: "flex", 
-                        alignItems: "center", 
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "5px 8px", 
-                        background: activeSpaceId === space.id ? "rgba(255,255,255,0.03)" : "transparent", 
-                        borderRadius: "var(--radius-sm)", 
-                        cursor: "pointer", 
-                        fontSize: "12.5px", 
-                        color: "white" 
+                        padding: "5px 8px",
+                        background: activeSpaceId === space.id ? "rgba(255,255,255,0.03)" : "transparent",
+                        borderRadius: "var(--radius-sm)",
+                        cursor: "pointer",
+                        fontSize: "12.5px",
+                        color: "white"
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
-                        <span 
+                        <span
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleSpace(space.id);
@@ -567,24 +567,24 @@ export const Sidebar: React.FC = () => {
                         <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: space.color || "hsl(var(--primary-hsl))", flexShrink: 0 }}></div>
                         <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{space.name}</span>
                       </div>
-                      
+
                       {/* Space Actions */}
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <Plus 
-                          size={11} 
-                          style={{ color: "hsl(var(--text-muted-hsl))" }} 
+                        <Plus
+                          size={11}
+                          style={{ color: "hsl(var(--text-muted-hsl))" }}
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveMenuSpaceId(activeMenuSpaceId === space.id ? null : space.id);
-                          }} 
+                          }}
                         />
-                        <Settings 
-                          size={11} 
-                          style={{ color: "hsl(var(--text-muted-hsl))" }} 
+                        <Settings
+                          size={11}
+                          style={{ color: "hsl(var(--text-muted-hsl))" }}
                           onClick={(e) => {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent("ww:open-space-modal", { detail: space.id }));
-                          }} 
+                          }}
                         />
                       </div>
                     </div>
@@ -631,7 +631,7 @@ export const Sidebar: React.FC = () => {
                       <div style={{ paddingLeft: "12px", display: "flex", flexDirection: "column", gap: "2px", marginTop: "1px" }}>
                         {/* Direct Space Lists */}
                         {space.lists?.map((list: any) => (
-                          <div 
+                          <div
                             key={list.id}
                             onClick={() => {
                               setActiveSpaceId(space.id);
@@ -640,24 +640,24 @@ export const Sidebar: React.FC = () => {
                               setActiveDocId(null);
                               setActiveChannelId(null);
                             }}
-                            style={{ 
-                              display: "flex", 
-                              alignItems: "center", 
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
                               justifyContent: "space-between",
-                              padding: "4px 8px", 
-                              borderRadius: "var(--radius-sm)", 
-                              background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent", 
-                              color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))", 
-                              cursor: "pointer", 
-                              fontSize: "12px" 
+                              padding: "4px 8px",
+                              borderRadius: "var(--radius-sm)",
+                              background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent",
+                              color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))",
+                              cursor: "pointer",
+                              fontSize: "12px"
                             }}
                           >
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
                               <List size={11} style={{ color: "hsl(var(--text-muted-hsl))", flexShrink: 0 }} />
                               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{list.name}</span>
                             </div>
-                            <Trash2 
-                              size={10} 
+                            <Trash2
+                              size={10}
                               style={{ color: "rgba(255,255,255,0.35)", cursor: "pointer" }}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -675,25 +675,25 @@ export const Sidebar: React.FC = () => {
                           return (
                             <div key={folder.id} style={{ display: "flex", flexDirection: "column" }}>
                               {/* Folder Item */}
-                              <div 
+                              <div
                                 onClick={() => {
                                   setActiveSpaceId(space.id);
                                   setActiveFolderId(folder.id);
                                 }}
-                                style={{ 
-                                  display: "flex", 
-                                  alignItems: "center", 
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
                                   justifyContent: "space-between",
-                                  padding: "4px 8px", 
-                                  borderRadius: "var(--radius-sm)", 
+                                  padding: "4px 8px",
+                                  borderRadius: "var(--radius-sm)",
                                   background: uiStore.activeFolderId === folder.id ? "rgba(255,255,255,0.04)" : "transparent",
-                                  cursor: "pointer", 
-                                  fontSize: "12px", 
-                                  color: uiStore.activeFolderId === folder.id ? "white" : "hsl(var(--text-secondary-hsl))" 
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  color: uiStore.activeFolderId === folder.id ? "white" : "hsl(var(--text-secondary-hsl))"
                                 }}
                               >
                                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
-                                  <span 
+                                  <span
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       toggleFolder(folder.id);
@@ -706,13 +706,13 @@ export const Sidebar: React.FC = () => {
                                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{folder.name}</span>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                  <Plus 
-                                    size={11} 
-                                    style={{ color: "hsl(var(--text-muted-hsl))" }} 
+                                  <Plus
+                                    size={11}
+                                    style={{ color: "hsl(var(--text-muted-hsl))" }}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setActiveMenuFolderId(activeMenuFolderId === folder.id ? null : folder.id);
-                                    }} 
+                                    }}
                                   />
                                 </div>
                               </div>
@@ -748,7 +748,7 @@ export const Sidebar: React.FC = () => {
                               {isFolderExpanded && (
                                 <div style={{ paddingLeft: "12px", display: "flex", flexDirection: "column", gap: "2px", marginTop: "1px" }}>
                                   {folder.lists?.map((list: any) => (
-                                    <div 
+                                    <div
                                       key={list.id}
                                       onClick={() => {
                                         setActiveSpaceId(space.id);
@@ -758,24 +758,24 @@ export const Sidebar: React.FC = () => {
                                         setActiveDocId(null);
                                         setActiveChannelId(null);
                                       }}
-                                      style={{ 
-                                        display: "flex", 
-                                        alignItems: "center", 
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
                                         justifyContent: "space-between",
-                                        padding: "4px 8px 4px 16px", 
-                                        borderRadius: "var(--radius-sm)", 
-                                        background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent", 
-                                        color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))", 
-                                        cursor: "pointer", 
-                                        fontSize: "11.5px" 
+                                        padding: "4px 8px 4px 16px",
+                                        borderRadius: "var(--radius-sm)",
+                                        background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent",
+                                        color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))",
+                                        cursor: "pointer",
+                                        fontSize: "11.5px"
                                       }}
                                     >
                                       <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
                                         <List size={11} style={{ color: "hsl(var(--text-muted-hsl))", flexShrink: 0 }} />
                                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{list.name}</span>
                                       </div>
-                                      <Trash2 
-                                        size={10} 
+                                      <Trash2
+                                        size={10}
                                         style={{ color: "rgba(255,255,255,0.35)", cursor: "pointer" }}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -803,17 +803,17 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Footer Settings Options */}
-      <div 
-        style={{ 
-          padding: "10px 14px", 
-          borderTop: "1px solid hsl(var(--border-hsl))", 
-          display: "flex", 
-          alignItems: "center", 
+      <div
+        style={{
+          padding: "10px 14px",
+          borderTop: "1px solid hsl(var(--border-hsl))",
+          display: "flex",
+          alignItems: "center",
           justifyContent: "space-between",
           background: "rgba(0,0,0,0.15)"
         }}
       >
-        <button 
+        <button
           onClick={() => setActiveViewId("goals")}
           style={{ background: "transparent", border: "none", color: "hsl(var(--text-secondary-hsl))", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", padding: "2px" }}
         >
