@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const getApiBaseUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  const envUrl = import.meta.env.VITE_API_URL || "http://techmans.me/";
   return envUrl.endsWith("/api") ? envUrl : `${envUrl}/api`;
 };
 
@@ -31,7 +31,7 @@ api.interceptors.response.use(
         try {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { withCredentials: true });
           const { accessToken: newToken, refreshToken: newRefreshToken } = response.data;
-          
+
           if (newToken) {
             localStorage.setItem("ww_access_token", newToken);
             localStorage.setItem("accessToken", newToken);
@@ -40,7 +40,7 @@ api.interceptors.response.use(
             localStorage.setItem("ww_refresh_token", newRefreshToken);
             localStorage.setItem("refreshToken", newRefreshToken);
           }
-          
+
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         } catch (refreshErr) {
