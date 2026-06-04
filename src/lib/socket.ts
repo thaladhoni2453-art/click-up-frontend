@@ -12,7 +12,7 @@ export const getSocket = (): Socket => {
       socket.disconnect();
     }
     currentToken = token;
-    socket = io("http://techmans.me/", {
+    socket = io("https://techmans.me/", {
       auth: { token },
       transports: ["websocket"],
       reconnection: true,
@@ -25,7 +25,7 @@ export const getSocket = (): Socket => {
         const refreshToken = localStorage.getItem("ww_refresh_token") || localStorage.getItem("refreshToken");
         if (refreshToken) {
           try {
-            const response = await fetch("http://techmans.me//api/auth/refresh", {
+            const response = await fetch("https://techmans.me//api/auth/refresh", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ refreshToken })

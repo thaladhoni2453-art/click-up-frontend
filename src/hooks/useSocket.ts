@@ -10,7 +10,7 @@ const getSocketUrl = (): string => {
     // Strip trailing /api if present to get root backend url for websockets
     return envUrl.endsWith("/api") ? envUrl.slice(0, -4) : envUrl;
   }
-  return "http://techmans.me/";
+  return "https://techmans.me/";
 };
 
 export const getSocket = (): Socket => {
@@ -35,7 +35,7 @@ export const getSocket = (): Socket => {
         const refreshToken = localStorage.getItem("ww_refresh_token") || localStorage.getItem("refreshToken");
         if (refreshToken) {
           try {
-            const baseUrl = import.meta.env.VITE_API_URL || "http://techmans.me/";
+            const baseUrl = import.meta.env.VITE_API_URL || "https://techmans.me/";
             const refreshUrl = baseUrl.endsWith("/api") ? `${baseUrl}/auth/refresh` : `${baseUrl}/api/auth/refresh`;
 
             const response = await fetch(refreshUrl, {
