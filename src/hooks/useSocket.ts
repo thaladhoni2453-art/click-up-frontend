@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 
 let socketInstance: Socket | null = null;
+let currentToken: string | null = null;
 
 const getSocketUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL;
@@ -13,17 +14,61 @@ const getSocketUrl = (): string => {
 };
 
 export const getSocket = (): Socket => {
-  if (!socketInstance) {
-    const socketUrl = getSocketUrl();
-    const token = localStorage.getItem("ww_access_token") || localStorage.getItem("accessToken");
-    
+  const token = localStorage.getItem("ww_access_token") || localStorage.getItem("accessToken");
+  const socketUrl = getSocketUrl();
+
+  if (!socketInstance || token !== currentToken) {
+    if (socketInstance) {
+      console.log("[Chat Socket] Token changed or socket reset, disconnecting old socket...");
+      socketInstance.disconnect();
+    }
+    currentToken = token;
     socketInstance = io(socketUrl, {
       auth: { token },
       transports: ["websocket", "polling"],
       reconnection: true,
     });
 
-    console.log(`[Chat Socket] Initialized connection to ${socketUrl}`);
+    socketInstance.on("connect_error", async (err) => {
+      if (err.message === "Unauthorized" || err.message === "Invalid token") {
+        console.warn("[Chat Socket] Authentication error on connection. Attempting token refresh...");
+        const refreshToken = localStorage.getItem("ww_refresh_token") || localStorage.getItem("refreshToken");
+        if (refreshToken) {
+          try {
+            const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+            const refreshUrl = baseUrl.endsWith("/api") ? `${baseUrl}/auth/refresh` : `${baseUrl}/api/auth/refresh`;
+            
+            const response = await fetch(refreshUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ refreshToken })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (data.accessToken) {
+                localStorage.setItem("ww_access_token", data.accessToken);
+                localStorage.setItem("accessToken", data.accessToken);
+                if (data.refreshToken) {
+                  localStorage.setItem("ww_refresh_token", data.refreshToken);
+                  localStorage.setItem("refreshToken", data.refreshToken);
+                }
+                console.log("[Chat Socket] Token refreshed successfully. Reconnecting socket...");
+                if (socketInstance) {
+                  socketInstance.auth = { token: data.accessToken };
+                  socketInstance.connect();
+                }
+                return;
+              }
+            }
+          } catch (refreshErr) {
+            console.error("[Chat Socket] Failed to refresh token on connection error", refreshErr);
+          }
+        }
+        window.dispatchEvent(new Event("ww:logout"));
+      }
+    });
+
+    console.log(`[Chat Socket] Initialized connection to ${socketUrl} with token: ${token ? "exists" : "none"}`);
   }
   return socketInstance;
 };

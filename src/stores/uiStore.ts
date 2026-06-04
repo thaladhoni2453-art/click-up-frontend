@@ -3,8 +3,9 @@ import { create } from "zustand";
 interface UIState {
   activeWorkspaceId: string | null;
   activeSpaceId: string | null;
+  activeFolderId: string | null;
   activeListId: string | null;
-  activeViewId: string; // "list" | "board" | "gantt" | "calendar" | "docs" | "chat" | "goals" | "dashboards" | "automations"
+  activeViewId: string; // "list" | "board" | "gantt" | "calendar" | "docs" | "chat" | "goals" | "dashboards" | "automations" | "space" | "folder"
   selectedTaskId: string | null; // Right-hand Task Detail panel drawer
   sidebarExpanded: boolean;
   activeDocId: string | null;
@@ -12,6 +13,7 @@ interface UIState {
 
   setActiveWorkspaceId: (id: string | null) => void;
   setActiveSpaceId: (id: string | null) => void;
+  setActiveFolderId: (id: string | null) => void;
   setActiveListId: (id: string | null) => void;
   setActiveViewId: (id: string) => void;
   setSelectedTaskId: (id: string | null) => void;
@@ -23,6 +25,7 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   activeWorkspaceId: null,
   activeSpaceId: null,
+  activeFolderId: null,
   activeListId: null,
   activeViewId: "list",
   selectedTaskId: null,
@@ -30,9 +33,10 @@ export const useUIStore = create<UIState>((set) => ({
   activeDocId: null,
   activeChannelId: null,
 
-  setActiveWorkspaceId: (id) => set({ activeWorkspaceId: id, activeSpaceId: null, activeListId: null }),
-  setActiveSpaceId: (id) => set({ activeSpaceId: id, activeListId: null }),
-  setActiveListId: (id) => set({ activeListId: id, activeViewId: "list" }),
+  setActiveWorkspaceId: (id) => set({ activeWorkspaceId: id, activeSpaceId: null, activeFolderId: null, activeListId: null }),
+  setActiveSpaceId: (id) => set({ activeSpaceId: id, activeFolderId: null, activeListId: null, activeViewId: "space", activeDocId: null, activeChannelId: null }),
+  setActiveFolderId: (id) => set({ activeFolderId: id, activeListId: null, activeViewId: "folder", activeDocId: null, activeChannelId: null }),
+  setActiveListId: (id) => set({ activeListId: id, activeViewId: "list", activeDocId: null, activeChannelId: null }),
   setActiveViewId: (id) => set((state) => ({ 
     activeViewId: id, 
     activeDocId: id === "docs" ? state.activeDocId : null, 

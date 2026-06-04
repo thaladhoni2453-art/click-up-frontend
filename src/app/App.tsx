@@ -18,6 +18,9 @@ import { AssignedCommentsView } from "../components/views/AssignedCommentsView";
 import { MyTasksView } from "../components/views/MyTasksView";
 import { PersonalSpaceView } from "../components/views/PersonalSpaceView";
 import { PomodoroView } from "../components/views/PomodoroView";
+import { SpaceOverview } from "../components/views/SpaceOverview";
+import { FolderView } from "../components/views/FolderView";
+import { SpaceModal } from "../components/views/SpaceModal";
 import { TaskDetail } from "../components/tasks/TaskDetail";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
@@ -32,6 +35,22 @@ export const App: React.FC = () => {
     return window.location.pathname.startsWith("/signup") || window.location.search.includes("invite=") ? "register" : "login";
   });
   const [sessionActive, setSessionActive] = useState(false);
+
+  const [showSpaceModal, setShowSpaceModal] = useState(false);
+  const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleOpenSpaceModal = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setEditingSpaceId(customEvent.detail || null);
+      setShowSpaceModal(true);
+    };
+
+    window.addEventListener("ww:open-space-modal", handleOpenSpaceModal);
+    return () => {
+      window.removeEventListener("ww:open-space-modal", handleOpenSpaceModal);
+    };
+  }, []);
 
   // Identify active user over WebSocket connection
   React.useEffect(() => {
@@ -55,7 +74,7 @@ export const App: React.FC = () => {
           window.history.pushState(null, "", data.channelId ? `/chat/${data.channelId}` : "/chat");
           useUIStore.setState({ 
             activeViewId: "chat", 
-            activeChannelId: data.channelId || "general",
+            activeChannelId: data.channelId || null,
             activeDocId: null
           });
         } catch (err) {
@@ -79,10 +98,10 @@ export const App: React.FC = () => {
 
       const view = parts[0];
       if (view === "docs") {
-        const docId = parts[1] || "general";
+        const docId = parts[1] === "general" ? null : (parts[1] || null);
         useUIStore.setState({ activeViewId: "docs", activeDocId: docId, activeChannelId: null });
       } else if (view === "chat") {
-        const channelId = parts[1] || "general";
+        const channelId = parts[1] === "general" ? null : (parts[1] || null);
         useUIStore.setState({ activeViewId: "chat", activeChannelId: channelId, activeDocId: null });
       } else {
         // Standard views
@@ -100,6 +119,8 @@ export const App: React.FC = () => {
 
   // State to URL push synchronizer: Whenever active state changes, push state to address bar
   React.useEffect(() => {
+    if (!user) return; // Do not synchronize workspace URLs if the user is not authenticated
+
     let targetPath = "/";
     if (activeViewId === "docs" && activeDocId) {
       targetPath = `/docs/${activeDocId}`;
@@ -112,7 +133,38 @@ export const App: React.FC = () => {
     if (window.location.pathname !== targetPath) {
       window.history.pushState(null, "", targetPath);
     }
-  }, [activeViewId, activeDocId, activeChannelId]);
+  }, [activeViewId, activeDocId, activeChannelId, user]);
+
+  // Protect routes based on authentication state
+  React.useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        setSessionActive(false);
+        // Not logged in: force browser URL to match the current authScreen ("/login" or "/signup")
+        const targetPath = authScreen === "register" ? "/signup" : "/login";
+        if (window.location.pathname !== targetPath && !window.location.search.includes("invite=")) {
+          window.history.replaceState(null, "", targetPath);
+        }
+      } else {
+        // Logged in: redirect from auth screens or root "/" to the default home view ("/inbox")
+        const path = window.location.pathname;
+        if (path === "/login" || path === "/signup" || path === "/register" || path === "/") {
+          const defaultView = "inbox";
+          useUIStore.getState().setActiveViewId(defaultView);
+          window.history.replaceState(null, "", `/${defaultView}`);
+        }
+      }
+    }
+  }, [user, loading, authScreen]);
+
+  React.useEffect(() => {
+    if (!user) {
+      setSessionActive(false);
+      // Reset auth screen based on URL on logout/unload
+      const isSignup = window.location.pathname.startsWith("/signup") || window.location.pathname.startsWith("/register") || window.location.search.includes("invite=");
+      setAuthScreen(isSignup ? "register" : "login");
+    }
+  }, [user]);
 
   if (loading) {
     return (
@@ -183,6 +235,10 @@ export const App: React.FC = () => {
         return <PlannerView />;
       case "pomodoro":
         return <PomodoroView />;
+      case "space":
+        return <SpaceOverview />;
+      case "folder":
+        return <FolderView />;
       default:
         return <ListView />;
     }
@@ -245,9 +301,11 @@ export const App: React.FC = () => {
                 key={item.id}
                 onClick={() => {
                   if (item.id === "docs") {
-                    useUIStore.getState().setActiveDocId("general");
+                    useUIStore.getState().setActiveDocId(null);
+                    useUIStore.getState().setActiveViewId("docs");
                   } else if (item.id === "chat") {
-                    useUIStore.getState().setActiveChannelId("general");
+                    useUIStore.getState().setActiveChannelId(null);
+                    useUIStore.getState().setActiveViewId("chat");
                   } else {
                     useUIStore.getState().setActiveViewId(item.id);
                   }
@@ -380,6 +438,16 @@ export const App: React.FC = () => {
 
       {/* Sliding sliding detail side task drawer panel */}
       <TaskDetail />
+
+      {showSpaceModal && (
+        <SpaceModal 
+          spaceId={editingSpaceId} 
+          onClose={() => {
+            setShowSpaceModal(false);
+            setEditingSpaceId(null);
+          }} 
+        />
+      )}
     </div>
   );
 };

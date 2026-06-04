@@ -6,7 +6,7 @@ import { api } from "../../lib/api";
 import { getSocket } from "../../lib/socket";
 import { 
   Folder, List, Layers, Plus, ChevronRight, ChevronDown, 
-  Settings, BookOpen, MessageSquare, Target, Calendar, BarChart3, HelpCircle, Inbox, Hash, Users, PlusCircle, Search, Timer
+  Settings, BookOpen, MessageSquare, Target, Calendar, BarChart3, HelpCircle, Inbox, Hash, Users, PlusCircle, Search, Timer, Trash2
 } from "lucide-react";
 
 export const Sidebar: React.FC = () => {
@@ -18,9 +18,9 @@ export const Sidebar: React.FC = () => {
   const activeListId = uiStore.activeListId;
   const activeViewId = uiStore.activeViewId;
   const activeChannelId = uiStore.activeChannelId;
-  
   const setActiveWorkspaceId = uiStore.setActiveWorkspaceId;
   const setActiveSpaceId = uiStore.setActiveSpaceId;
+  const setActiveFolderId = uiStore.setActiveFolderId;
   const setActiveListId = uiStore.setActiveListId;
   const setActiveViewId = uiStore.setActiveViewId;
   const setActiveDocId = uiStore.setActiveDocId;
@@ -40,30 +40,11 @@ export const Sidebar: React.FC = () => {
 
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
+  // SpaceModal and CRUD popover states
+  const [activeMenuSpaceId, setActiveMenuSpaceId] = useState<string | null>(null);
+  const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);
+
   // Connect socket and listen for online/offline presence status updates
-  React.useEffect(() => {
-    const socket = getSocket();
-    
-    // Fetch initial list of online users
-    socket.emit("get:online-users", (users: string[]) => {
-      if (Array.isArray(users)) setOnlineUsers(users);
-    });
-
-    socket.on("user:online", (userId: string) => {
-      setOnlineUsers((prev) => [...new Set([...prev, userId])]);
-    });
-
-    socket.on("user:offline", (data: any) => {
-      const userId = typeof data === "string" ? data : data.userId;
-      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
-    });
-
-    return () => {
-      socket.off("user:online");
-      socket.off("user:offline");
-    };
-  }, []);
-
   // Set default workspace if none selected
   React.useEffect(() => {
     if (workspaces.length > 0 && !activeWorkspaceId) {
@@ -92,22 +73,120 @@ export const Sidebar: React.FC = () => {
     refetchInterval: 5000, // Refresh status and rooms list every 5s
   });
 
+  // Connect socket and listen for online/offline presence status updates and channel lists changes
+  React.useEffect(() => {
+    const socket = getSocket();
+    
+    // Fetch initial list of online users
+    socket.emit("get:online-users", (users: string[]) => {
+      if (Array.isArray(users)) setOnlineUsers(users);
+    });
+
+    socket.on("user:online", (userId: string) => {
+      setOnlineUsers((prev) => [...new Set([...prev, userId])]);
+    });
+
+    socket.on("user:offline", (data: any) => {
+      const userId = typeof data === "string" ? data : data.userId;
+      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
+    });
+
+    // Real-time channel list invalidation
+    const handleChannelChange = () => {
+      refetchChannels();
+    };
+
+    socket.on("channel:new", handleChannelChange);
+    socket.on("channel:removed", handleChannelChange);
+    socket.on("channel:updated", handleChannelChange);
+
+    return () => {
+      socket.off("user:online");
+      socket.off("user:offline");
+      socket.off("channel:new", handleChannelChange);
+      socket.off("channel:removed", handleChannelChange);
+      socket.off("channel:updated", handleChannelChange);
+    };
+  }, [refetchChannels]);
+
   // Filter channels based on type
   const rooms = channels.filter((c: any) => !c.isDM && !c.isGroup);
   const groups = channels.filter((c: any) => c.isGroup);
   const dms = channels.filter((c: any) => c.isDM);
 
-  // Space additions mutation
-  const createSpaceMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const { data } = await api.post(`/workspaces/${activeWorkspaceId}/spaces`, { name });
+  // Create Folder inside Space
+  const createFolderMutation = useMutation({
+    mutationFn: async ({ spaceId, name }: { spaceId: string; name: string }) => {
+      const { data } = await api.post(`/spaces/${spaceId}/folders`, { name });
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
-      setNewSpaceName("");
-      setShowAddSpace(false);
+    }
+  });
+
+  // Create List directly inside Space
+  const createSpaceListMutation = useMutation({
+    mutationFn: async ({ spaceId, name }: { spaceId: string; name: string }) => {
+      const { data } = await api.post(`/workspaces/spaces/${spaceId}/lists`, { name });
+      return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
+    }
+  });
+
+  // Create List inside Folder
+  const createFolderListMutation = useMutation({
+    mutationFn: async ({ folderId, name }: { folderId: string; name: string }) => {
+      const { data } = await api.post(`/folders/${folderId}/lists`, { name });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
+    }
+  });
+
+  // Delete Folder
+  const deleteFolderMutation = useMutation({
+    mutationFn: async (folderId: string) => {
+      const { data } = await api.delete(`/folders/${folderId}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
+      if (uiStore.activeFolderId === folderId) {
+        uiStore.setActiveFolderId(null);
+      }
+    }
+  });
+
+  // Delete List
+  const deleteListMutation = useMutation({
+    mutationFn: async (listId: string) => {
+      const { data } = await api.delete(`/workspaces/lists/${listId}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
+      if (uiStore.activeListId === listId) {
+        uiStore.setActiveListId(null);
+      }
+    }
+  });
+
+  // Delete Space
+  const deleteSpaceMutation = useMutation({
+    mutationFn: async (spaceId: string) => {
+      const { data } = await api.delete(`/spaces/${spaceId}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hierarchy", activeWorkspaceId] });
+      if (uiStore.activeSpaceId === spaceId) {
+        uiStore.setActiveSpaceId(null);
+      }
+    }
   });
 
   const toggleSpace = (spaceId: string) => {
@@ -116,13 +195,6 @@ export const Sidebar: React.FC = () => {
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
-  };
-
-  const handleAddSpace = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newSpaceName.trim()) {
-      createSpaceMutation.mutate(newSpaceName);
-    }
   };
 
   // Helper to extract DM partner
@@ -150,8 +222,9 @@ export const Sidebar: React.FC = () => {
       partnerEmail = inviterEmail;
     }
     
-    if (fullName.startsWith("dm:") || fullName === "Chat Partner" || fullName === "Member" || fullName === "M Member") {
-      const partnerName = partnerEmail.split("@")[0];
+    if (fullName.startsWith("dm:") || fullName === "Chat Partner" || fullName === "Member" || fullName === "M Member" || fullName.includes("@")) {
+      const emailToParse = fullName.includes("@") ? fullName : partnerEmail;
+      const partnerName = emailToParse.split("@")[0];
       fullName = partnerName.charAt(0).toUpperCase() + partnerName.slice(1);
     }
 
@@ -338,90 +411,7 @@ export const Sidebar: React.FC = () => {
           )}
         </div>
 
-        {/* CHANNELS */}
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: "6px" }}>
-            <button
-              onClick={() => setExpandedChannels(!expandedChannels)}
-              style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 6px", background: "transparent", border: "none", color: "white", cursor: "pointer", fontSize: "11px", fontWeight: "700", textAlign: "left" }}
-            >
-              <span style={{ color: "hsl(var(--text-muted-hsl))" }}>
-                {expandedChannels ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              </span>
-              <span style={{ color: "hsl(var(--text-muted-hsl))" }}>CHANNELS</span>
-            </button>
-            <Plus size={11} style={{ color: "hsl(var(--text-muted-hsl))", cursor: "pointer" }} onClick={() => {
-              setActiveViewId("chat");
-              setTimeout(() => {
-                window.dispatchEvent(new Event("ww:open-create-group"));
-              }, 100);
-            }} />
-          </div>
 
-          {expandedChannels && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "12px", marginTop: "2px" }}>
-              {rooms.map((r: any) => {
-                const isActive = activeChannelId === r.id && activeViewId === "chat";
-                return (
-                  <button 
-                    key={r.id}
-                    onClick={() => {
-                      setActiveViewId("chat");
-                      setActiveChannelId(r.id);
-                    }}
-                    style={{ 
-                      width: "100%", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      gap: "8px",
-                      padding: "5px 8px", 
-                      background: isActive ? "rgba(255,255,255,0.06)" : "transparent", 
-                      border: "none", 
-                      borderRadius: "var(--radius-sm)", 
-                      color: isActive ? "white" : "hsl(var(--text-secondary-hsl))", 
-                      cursor: "pointer", 
-                      fontSize: "12.5px",
-                      textAlign: "left"
-                    }}
-                  >
-                    <Hash size={13} style={{ color: "hsl(var(--text-muted-hsl))" }} />
-                    <span style={{ fontWeight: isActive ? "600" : "500" }}>{r.name}</span>
-                  </button>
-                );
-              })}
-
-              {groups.map((g: any) => {
-                const isActive = activeChannelId === g.id && activeViewId === "chat";
-                return (
-                  <button 
-                    key={g.id}
-                    onClick={() => {
-                      setActiveViewId("chat");
-                      setActiveChannelId(g.id);
-                    }}
-                    style={{ 
-                      width: "100%", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      gap: "8px",
-                      padding: "5px 8px", 
-                      background: isActive ? "rgba(255,255,255,0.06)" : "transparent", 
-                      border: "none", 
-                      borderRadius: "var(--radius-sm)", 
-                      color: isActive ? "white" : "hsl(var(--text-secondary-hsl))", 
-                      cursor: "pointer", 
-                      fontSize: "12.5px",
-                      textAlign: "left"
-                    }}
-                  >
-                    <Users size={13} style={{ color: "hsl(var(--text-muted-hsl))" }} />
-                    <span style={{ fontWeight: isActive ? "600" : "500", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
         {/* DIRECT MESSAGES */}
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -522,7 +512,7 @@ export const Sidebar: React.FC = () => {
 
         {/* SPACES HIERARCHY */}
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: "6px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifySpaceBetween: "space-between", paddingRight: "6px" }}>
             <button
               onClick={() => setExpandedSpacesSec(!expandedSpacesSec)}
               style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 6px", background: "transparent", border: "none", color: "white", cursor: "pointer", fontSize: "11px", fontWeight: "700", textAlign: "left" }}
@@ -532,25 +522,17 @@ export const Sidebar: React.FC = () => {
               </span>
               <span style={{ color: "hsl(var(--text-muted-hsl))" }}>SPACES</span>
             </button>
-            <Plus size={11} style={{ color: "hsl(var(--text-muted-hsl))", cursor: "pointer" }} onClick={() => setShowAddSpace(!showAddSpace)} />
+            <Plus 
+              size={11} 
+              style={{ color: "hsl(var(--text-muted-hsl))", cursor: "pointer" }} 
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("ww:open-space-modal", { detail: null }));
+              }} 
+            />
           </div>
 
           {expandedSpacesSec && (
             <div style={{ paddingLeft: "4px", display: "flex", flexDirection: "column", gap: "2px", marginTop: "2px" }}>
-              {showAddSpace && (
-                <form onSubmit={handleAddSpace} style={{ display: "flex", gap: "6px", marginBottom: "8px", paddingLeft: "8px" }}>
-                  <input 
-                    type="text" 
-                    placeholder="Space name..." 
-                    value={newSpaceName}
-                    onChange={(e) => setNewSpaceName(e.target.value)}
-                    className="input-field"
-                    style={{ flex: 1, height: "26px", fontSize: "11.5px", padding: "2px 6px" }}
-                  />
-                  <button type="submit" className="btn btn-primary" style={{ padding: "2px 6px", fontSize: "11px", height: "26px" }}>Add</button>
-                </form>
-              )}
-
               {spaces.map((space: any) => {
                 const isSpaceExpanded = expandedSpaces[space.id];
                 return (
@@ -559,16 +541,90 @@ export const Sidebar: React.FC = () => {
                     <div 
                       onClick={() => {
                         setActiveSpaceId(space.id);
-                        toggleSpace(space.id);
                       }}
-                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "5px 8px", background: activeSpaceId === space.id ? "rgba(255,255,255,0.03)" : "transparent", borderRadius: "var(--radius-sm)", cursor: "pointer", fontSize: "12.5px", color: "white" }}
+                      style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "space-between",
+                        padding: "5px 8px", 
+                        background: activeSpaceId === space.id ? "rgba(255,255,255,0.03)" : "transparent", 
+                        borderRadius: "var(--radius-sm)", 
+                        cursor: "pointer", 
+                        fontSize: "12.5px", 
+                        color: "white" 
+                      }}
                     >
-                      <span style={{ display: "flex", alignItems: "center", color: "hsl(var(--text-muted-hsl))" }}>
-                        {isSpaceExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                      </span>
-                      <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: space.color || "hsl(var(--primary-hsl))" }}></div>
-                      <span style={{ fontWeight: 500 }}>{space.name}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
+                        <span 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSpace(space.id);
+                          }}
+                          style={{ display: "flex", alignItems: "center", color: "hsl(var(--text-muted-hsl))", padding: "2px" }}
+                        >
+                          {isSpaceExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        </span>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: space.color || "hsl(var(--primary-hsl))", flexShrink: 0 }}></div>
+                        <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{space.name}</span>
+                      </div>
+                      
+                      {/* Space Actions */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <Plus 
+                          size={11} 
+                          style={{ color: "hsl(var(--text-muted-hsl))" }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuSpaceId(activeMenuSpaceId === space.id ? null : space.id);
+                          }} 
+                        />
+                        <Settings 
+                          size={11} 
+                          style={{ color: "hsl(var(--text-muted-hsl))" }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent("ww:open-space-modal", { detail: space.id }));
+                          }} 
+                        />
+                      </div>
                     </div>
+
+                    {/* Inline Action Sub-menu for Space */}
+                    {activeMenuSpaceId === space.id && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px 4px 24px", background: "rgba(255,255,255,0.02)", borderRadius: "4px", margin: "2px 0" }}>
+                        <button
+                          onClick={() => {
+                            const name = window.prompt("New Folder Name:");
+                            if (name?.trim()) createFolderMutation.mutate({ spaceId: space.id, name: name.trim() });
+                            setActiveMenuSpaceId(null);
+                          }}
+                          style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "10.5px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", padding: "2px 6px", borderRadius: "4px", cursor: "pointer" }}
+                        >
+                          <Folder size={10} /> +Folder
+                        </button>
+                        <button
+                          onClick={() => {
+                            const name = window.prompt("New List Name:");
+                            if (name?.trim()) createSpaceListMutation.mutate({ spaceId: space.id, name: name.trim() });
+                            setActiveMenuSpaceId(null);
+                          }}
+                          style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "10.5px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", padding: "2px 6px", borderRadius: "4px", cursor: "pointer" }}
+                        >
+                          <List size={10} /> +List
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to delete space "${space.name}"?`)) {
+                              deleteSpaceMutation.mutate(space.id);
+                            }
+                            setActiveMenuSpaceId(null);
+                          }}
+                          style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "10.5px", background: "rgba(239,68,68,0.15)", border: "none", color: "#F87171", padding: "2px 6px", borderRadius: "4px", cursor: "pointer" }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
 
                     {/* Sub-Folders & Sub-Lists */}
                     {isSpaceExpanded && (
@@ -584,10 +640,32 @@ export const Sidebar: React.FC = () => {
                               setActiveDocId(null);
                               setActiveChannelId(null);
                             }}
-                            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "var(--radius-sm)", background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent", color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))", cursor: "pointer", fontSize: "12px" }}
+                            style={{ 
+                              display: "flex", 
+                              alignItems: "center", 
+                              justifyContent: "space-between",
+                              padding: "4px 8px", 
+                              borderRadius: "var(--radius-sm)", 
+                              background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent", 
+                              color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))", 
+                              cursor: "pointer", 
+                              fontSize: "12px" 
+                            }}
                           >
-                            <List size={11} style={{ color: "hsl(var(--text-muted-hsl))" }} />
-                            <span>{list.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
+                              <List size={11} style={{ color: "hsl(var(--text-muted-hsl))", flexShrink: 0 }} />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{list.name}</span>
+                            </div>
+                            <Trash2 
+                              size={10} 
+                              style={{ color: "rgba(255,255,255,0.35)", cursor: "pointer" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Are you sure you want to delete list "${list.name}"?`)) {
+                                  deleteListMutation.mutate(list.id);
+                                }
+                              }}
+                            />
                           </div>
                         ))}
 
@@ -598,15 +676,73 @@ export const Sidebar: React.FC = () => {
                             <div key={folder.id} style={{ display: "flex", flexDirection: "column" }}>
                               {/* Folder Item */}
                               <div 
-                                onClick={() => toggleFolder(folder.id)}
-                                style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "var(--radius-sm)", cursor: "pointer", fontSize: "12px", color: "hsl(var(--text-secondary-hsl))" }}
+                                onClick={() => {
+                                  setActiveSpaceId(space.id);
+                                  setActiveFolderId(folder.id);
+                                }}
+                                style={{ 
+                                  display: "flex", 
+                                  alignItems: "center", 
+                                  justifyContent: "space-between",
+                                  padding: "4px 8px", 
+                                  borderRadius: "var(--radius-sm)", 
+                                  background: uiStore.activeFolderId === folder.id ? "rgba(255,255,255,0.04)" : "transparent",
+                                  cursor: "pointer", 
+                                  fontSize: "12px", 
+                                  color: uiStore.activeFolderId === folder.id ? "white" : "hsl(var(--text-secondary-hsl))" 
+                                }}
                               >
-                                <span style={{ display: "flex", alignItems: "center", color: "hsl(var(--text-muted-hsl))" }}>
-                                  {isFolderExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                                </span>
-                                <Folder size={12} style={{ color: "hsl(var(--warning-hsl))" }} />
-                                <span>{folder.name}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
+                                  <span 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleFolder(folder.id);
+                                    }}
+                                    style={{ display: "flex", alignItems: "center", color: "hsl(var(--text-muted-hsl))", padding: "2px" }}
+                                  >
+                                    {isFolderExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                                  </span>
+                                  <Folder size={12} style={{ color: "hsl(var(--warning-hsl))", flexShrink: 0 }} />
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{folder.name}</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                  <Plus 
+                                    size={11} 
+                                    style={{ color: "hsl(var(--text-muted-hsl))" }} 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveMenuFolderId(activeMenuFolderId === folder.id ? null : folder.id);
+                                    }} 
+                                  />
+                                </div>
                               </div>
+
+                              {/* Inline Action Sub-menu for Folder */}
+                              {activeMenuFolderId === folder.id && (
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px 4px 24px", background: "rgba(255,255,255,0.02)", borderRadius: "4px", margin: "2px 0" }}>
+                                  <button
+                                    onClick={() => {
+                                      const name = window.prompt("New List Name:");
+                                      if (name?.trim()) createFolderListMutation.mutate({ folderId: folder.id, name: name.trim() });
+                                      setActiveMenuFolderId(null);
+                                    }}
+                                    style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "10px", background: "rgba(255,255,255,0.05)", border: "none", color: "white", padding: "2px 6px", borderRadius: "4px", cursor: "pointer" }}
+                                  >
+                                    <List size={10} /> +List
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`Are you sure you want to delete folder "${folder.name}"?`)) {
+                                        deleteFolderMutation.mutate(folder.id);
+                                      }
+                                      setActiveMenuFolderId(null);
+                                    }}
+                                    style={{ display: "flex", alignItems: "center", gap: "2px", fontSize: "10px", background: "rgba(239,68,68,0.15)", border: "none", color: "#F87171", padding: "2px 6px", borderRadius: "4px", cursor: "pointer" }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
 
                               {/* Folder Lists */}
                               {isFolderExpanded && (
@@ -616,15 +752,38 @@ export const Sidebar: React.FC = () => {
                                       key={list.id}
                                       onClick={() => {
                                         setActiveSpaceId(space.id);
+                                        setActiveFolderId(folder.id);
                                         setActiveListId(list.id);
                                         setActiveViewId("list");
                                         setActiveDocId(null);
                                         setActiveChannelId(null);
                                       }}
-                                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px", borderRadius: "var(--radius-sm)", background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent", color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))", cursor: "pointer", fontSize: "11.5px" }}
+                                      style={{ 
+                                        display: "flex", 
+                                        alignItems: "center", 
+                                        justifyContent: "space-between",
+                                        padding: "4px 8px 4px 16px", 
+                                        borderRadius: "var(--radius-sm)", 
+                                        background: activeListId === list.id ? "rgba(255,255,255,0.08)" : "transparent", 
+                                        color: activeListId === list.id ? "white" : "hsl(var(--text-secondary-hsl))", 
+                                        cursor: "pointer", 
+                                        fontSize: "11.5px" 
+                                      }}
                                     >
-                                      <List size={11} style={{ color: "hsl(var(--text-muted-hsl))" }} />
-                                      <span>{list.name}</span>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
+                                        <List size={11} style={{ color: "hsl(var(--text-muted-hsl))", flexShrink: 0 }} />
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{list.name}</span>
+                                      </div>
+                                      <Trash2 
+                                        size={10} 
+                                        style={{ color: "rgba(255,255,255,0.35)", cursor: "pointer" }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (window.confirm(`Are you sure you want to delete list "${list.name}"?`)) {
+                                            deleteListMutation.mutate(list.id);
+                                          }
+                                        }}
+                                      />
                                     </div>
                                   ))}
                                 </div>

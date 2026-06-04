@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, setAccessToken } from "../lib/api";
 
 const queryClient = new QueryClient({
-  defaultQueries: {
+  defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
@@ -43,6 +43,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     fetchProfile();
+
+    const handleGlobalLogout = () => {
+      setUser(null);
+      setWorkspaces([]);
+    };
+
+    window.addEventListener("ww:logout", handleGlobalLogout);
+    return () => window.removeEventListener("ww:logout", handleGlobalLogout);
   }, []);
 
   const login = async (credentials: any) => {

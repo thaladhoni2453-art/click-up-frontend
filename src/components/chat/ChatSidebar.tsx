@@ -87,8 +87,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onOpenInvite, onOpenCr
       // Invalidate query to refresh sidebars instantly!
       queryClient.invalidateQueries({ queryKey: ["channels"] });
 
-      // Update global Zustand store with new DM channel
-      useChatStore.getState().addChannel(channel);
+      // Fetch properly formatted channels list from the server
+      const { data: channelsData } = await api.get("/chat/channels");
+      useChatStore.getState().setChannels(channelsData.channels || []);
+
       setActiveChannelId(channel.id);
       
       // Reset search form
@@ -328,9 +330,12 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onOpenInvite, onOpenCr
                     if (inviterEmail && user?.email && inviterEmail !== user.email) {
                       partnerEmail = inviterEmail;
                     }
-                    const partnerName = partnerEmail.split("@")[0];
-                    displayName = partnerName.charAt(0).toUpperCase() + partnerName.slice(1);
+                    displayName = partnerEmail;
                   }
+                }
+                if (displayName.includes("@")) {
+                  const partnerName = displayName.split("@")[0];
+                  displayName = partnerName.charAt(0).toUpperCase() + partnerName.slice(1);
                 }
 
                 return (

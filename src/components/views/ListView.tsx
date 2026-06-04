@@ -109,8 +109,9 @@ export const ListView: React.FC = () => {
       ) : (
         <div className="glass-panel" style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid hsl(var(--border-hsl))" }}>
           {/* Header titles */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr 0.5fr", padding: "12px 20px", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid hsl(var(--border-hsl))", fontWeight: "600", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.03em", color: "hsl(var(--text-muted-hsl))" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 0.8fr 1fr 1fr 1.2fr 0.5fr", padding: "12px 20px", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid hsl(var(--border-hsl))", fontWeight: "600", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.03em", color: "hsl(var(--text-muted-hsl))" }}>
             <div>Task Name</div>
+            <div>Assignee</div>
             <div>Status</div>
             <div>Priority</div>
             <div>Due Date</div>
@@ -124,13 +125,69 @@ export const ListView: React.FC = () => {
                 key={task.id}
                 onClick={() => setSelectedTaskId(task.id)}
                 className="animate-fade-in"
-                style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1.2fr 0.5fr", padding: "14px 20px", borderBottom: "1px solid hsl(var(--border-hsl))", cursor: "pointer", transition: "var(--transition-smooth)", alignItems: "center" }}
+                style={{ display: "grid", gridTemplateColumns: "2fr 0.8fr 1fr 1fr 1.2fr 0.5fr", padding: "14px 20px", borderBottom: "1px solid hsl(var(--border-hsl))", cursor: "pointer", transition: "var(--transition-smooth)", alignItems: "center" }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
                 {/* Name */}
                 <div style={{ fontWeight: "500", color: "white", display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "13.5px" }}>{task.name}</span>
+                </div>
+
+                {/* Assignee */}
+                <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center" }}>
+                  {task.assignees && task.assignees.length > 0 ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "-6px" }}>
+                      {task.assignees.slice(0, 3).map((a: any, idx: number) => {
+                        const u = a.user || a;
+                        const initials = u.fullName?.charAt(0).toUpperCase() || "?";
+                        return (
+                          <div
+                            key={u.id || idx}
+                            title={u.fullName}
+                            style={{
+                              width: "22px",
+                              height: "22px",
+                              borderRadius: "50%",
+                              background: "hsl(var(--primary-hsl))",
+                              border: "1px solid #1e2030",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "9px",
+                              fontWeight: "700",
+                              color: "white",
+                              marginLeft: idx > 0 ? "-6px" : "0",
+                              zIndex: 10 - idx,
+                            }}
+                          >
+                            {initials}
+                          </div>
+                        );
+                      })}
+                      {task.assignees.length > 3 && (
+                        <span style={{ fontSize: "10px", color: "hsl(var(--text-muted-hsl))", marginLeft: "4px" }}>
+                          +{task.assignees.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div 
+                      title="No Assignee"
+                      style={{
+                        width: "22px",
+                        height: "22px",
+                        borderRadius: "50%",
+                        border: "1px dashed rgba(255,255,255,0.2)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "rgba(255,255,255,0.3)"
+                      }}
+                    >
+                      <User size={11} />
+                    </div>
+                  )}
                 </div>
 
                 {/* Status Selector */}
@@ -159,9 +216,66 @@ export const ListView: React.FC = () => {
                 </div>
 
                 {/* Due Date Indicator */}
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "hsl(var(--text-secondary-hsl))", fontSize: "13px" }}>
-                  <Clock size={13} style={{ color: "hsl(var(--text-muted-hsl))" }} />
-                  {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No Date"}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const container = e.currentTarget;
+                    const input = container.querySelector("input[type='date']") as HTMLInputElement;
+                    if (input) {
+                      try {
+                        input.showPicker();
+                      } catch (err) {
+                        input.focus();
+                      }
+                    }
+                  }} 
+                  style={{ 
+                    position: "relative", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "6px", 
+                    color: "hsl(var(--text-secondary-hsl))", 
+                    fontSize: "13px",
+                    width: "120px",
+                    height: "24px",
+                    cursor: "pointer"
+                  }}
+                >
+                  {/* Hidden native input inside the cell to call showPicker() */}
+                  <input
+                    type="date"
+                    value={(() => {
+                      if (!task.dueDate) return "";
+                      try {
+                        return new Date(task.dueDate).toISOString().split("T")[0];
+                      } catch {
+                        return "";
+                      }
+                    })()}
+                    onChange={(e) => {
+                      updateTask.mutate({ 
+                        taskId: task.id, 
+                        updateData: { dueDate: e.target.value ? new Date(e.target.value).toISOString() : null } 
+                      });
+                    }}
+                    onClick={(e) => e.stopPropagation()} // Prevent double clicks on picker trigger
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "0px",
+                      height: "0px",
+                      visibility: "hidden"
+                    }}
+                  />
+                  
+                  {/* Beautiful custom-styled visual display underneath */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Clock size={13} style={{ color: "hsl(var(--text-muted-hsl))" }} />
+                    <span style={{ fontSize: "12.5px" }}>
+                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No Date"}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Actions Hub */}

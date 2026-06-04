@@ -2,44 +2,95 @@ import React, { useState } from "react";
 import { useAuth } from "../../app/providers";
 import { useUIStore } from "../../stores/uiStore";
 import { api } from "../../lib/api";
-import { Bell, Search, Sparkles, User, LogOut } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, Search, Sparkles, User, LogOut, ChevronRight } from "lucide-react";
 
 export const TopNav: React.FC = () => {
-  const { user, logout } = useAuth();
-  const { activeWorkspaceId, activeViewId, setSelectedTaskId } = useUIStore();
-  const [standup, setStandup] = useState<string | null>(null);
-  const [loadingStandup, setLoadingStandup] = useState(false);
+  const { user, logout, workspaces } = useAuth();
+  const uiStore = useUIStore();
+  const { activeWorkspaceId, activeSpaceId, activeFolderId, activeListId } = uiStore;
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const triggerAIStandup = async () => {
-    setLoadingStandup(true);
-    try {
-      const { data } = await api.post("/extra/ai/workspace/standup", {});
-      setStandup(data.summary);
-    } catch (e) {
-      setStandup("### 🤖 WaveWork AI Standup\n\nFailed to aggregate your standup. Ensure server connection is active!");
-    } finally {
-      setLoadingStandup(false);
+  // Fetch Hierarchy from Cache instantly
+  const { data: spaces = [] } = useQuery<any[]>({
+    queryKey: ["hierarchy", activeWorkspaceId],
+    queryFn: async () => {
+      const { data } = await api.get(`/workspaces/${activeWorkspaceId}/hierarchy`);
+      return data;
+    },
+    enabled: !!activeWorkspaceId,
+    staleTime: Infinity,
+  });
+
+  const currentWorkspaceName = workspaces.find(w => w.id === activeWorkspaceId)?.name || "Workspace";
+  const activeSpace = spaces.find(s => s.id === activeSpaceId);
+  const activeFolder = activeSpace?.folders?.find((f: any) => f.id === activeFolderId);
+  
+  // List name resolution
+  let activeListName = "";
+  if (activeListId) {
+    const spaceList = activeSpace?.lists?.find((l: any) => l.id === activeListId);
+    if (spaceList) {
+      activeListName = spaceList.name;
+    } else {
+      const folderList = activeFolder?.lists?.find((l: any) => l.id === activeListId);
+      if (folderList) {
+        activeListName = folderList.name;
+      } else {
+        activeSpace?.folders?.forEach((f: any) => {
+          const l = f.lists?.find((li: any) => li.id === activeListId);
+          if (l) activeListName = l.name;
+        });
+      }
     }
-  };
+  }
 
   return (
     <header className="glass-panel" style={{ height: "60px", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid hsl(var(--border-hsl))", position: "relative", zIndex: 50 }}>
-      {/* Search Input Bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "40%" }}>
-        <Search size={16} style={{ color: "hsl(var(--text-muted-hsl))" }} />
-        <input
-          type="text"
-          placeholder="Global Search (Cmd + K)..."
-          className="input-field"
-          style={{ width: "100%", height: "34px", background: "rgba(0,0,0,0.2)" }}
-        />
+      
+      {/* ClickUp-style Breadcrumb navigation path */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        {/* Workspace Node */}
+        <span style={{ fontSize: "12.5px", fontWeight: "700", color: "rgba(255,255,255,0.45)", letterSpacing: "0.02em" }}>
+          {currentWorkspaceName.toUpperCase()}
+        </span>
+
+        {/* Space Node */}
+        {activeSpace && (
+          <>
+            <ChevronRight size={13} style={{ color: "rgba(255,255,255,0.2)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: activeSpace.color || "hsl(var(--primary-hsl))" }} />
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "white" }}>
+                {activeSpace.name}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Folder Node */}
+        {activeFolder && (
+          <>
+            <ChevronRight size={13} style={{ color: "rgba(255,255,255,0.2)" }} />
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "hsl(var(--warning-hsl))" }}>
+              {activeFolder.name}
+            </span>
+          </>
+        )}
+
+        {/* List Node */}
+        {activeListId && activeListName && (
+          <>
+            <ChevronRight size={13} style={{ color: "rgba(255,255,255,0.2)" }} />
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "white" }}>
+              {activeListName}
+            </span>
+          </>
+        )}
       </div>
 
-      {/* Action and User Profiles Hub */}
+      {/* Global Actions and User Profiles Hub */}
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-
-
         {/* Notifications Icon */}
         <button style={{ background: "transparent", border: "none", cursor: "pointer", position: "relative" }}>
           <Bell size={20} style={{ color: "hsl(var(--text-secondary-hsl))" }} />
@@ -74,7 +125,6 @@ export const TopNav: React.FC = () => {
           )}
         </div>
       </div>
-
 
     </header>
   );

@@ -5,6 +5,8 @@ export const taskKeys = {
   all: ["tasks"] as const,
   byList: (listId: string, filters: any = {}) => ["tasks", "list", listId, filters] as const,
   detail: (taskId: string) => ["tasks", "detail", taskId] as const,
+  assignees: (taskId: string) => ["tasks", "assignees", taskId] as const,
+  eligibleAssignees: (taskId: string) => ["tasks", "eligibleAssignees", taskId] as const,
 };
 
 export function useTasks(listId: string | null, filters: any = {}) {
@@ -25,6 +27,30 @@ export function useTaskDetails(taskId: string | null) {
     queryFn: async () => {
       if (!taskId) return null;
       const { data } = await api.get(`/tasks/${taskId}`);
+      return data;
+    },
+    enabled: !!taskId,
+  });
+}
+
+export function useTaskAssignees(taskId: string | null) {
+  return useQuery({
+    queryKey: taskKeys.assignees(taskId || ""),
+    queryFn: async () => {
+      if (!taskId) return [];
+      const { data } = await api.get(`/tasks/${taskId}/assignees`);
+      return data;
+    },
+    enabled: !!taskId,
+  });
+}
+
+export function useEligibleAssignees(taskId: string | null) {
+  return useQuery({
+    queryKey: taskKeys.eligibleAssignees(taskId || ""),
+    queryFn: async () => {
+      if (!taskId) return [];
+      const { data } = await api.get(`/tasks/${taskId}/eligible-assignees`);
       return data;
     },
     enabled: !!taskId,
@@ -110,11 +136,29 @@ export function useTaskMutations() {
     },
   });
 
+  const toggleAssignee = useMutation({
+    mutationFn: async ({ taskId, userId, isAssigned }: { taskId: string; userId: string; isAssigned: boolean }) => {
+      if (isAssigned) {
+        const { data } = await api.delete(`/tasks/${taskId}/assignees/${userId}`);
+        return data;
+      } else {
+        const { data } = await api.post(`/tasks/${taskId}/assignees`, { userId });
+        return data;
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(variables.taskId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.assignees(variables.taskId) });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
   return {
     createTask,
     updateTask,
     deleteTask,
     addComment,
     logTime,
+    toggleAssignee,
   };
 }

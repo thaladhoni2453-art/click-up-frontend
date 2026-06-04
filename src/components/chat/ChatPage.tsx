@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useChatStore } from "../../stores/chatStore";
+import { useUIStore } from "../../stores/uiStore";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageArea } from "./MessageArea";
 import { InviteModal } from "./InviteModal";
@@ -24,6 +25,23 @@ export const ChatPage: React.FC = () => {
     incomingCall, 
     setIncomingCall 
   } = useChatStore();
+
+  const uiActiveChannelId = useUIStore(state => state.activeChannelId);
+  const setUiActiveChannelId = useUIStore(state => state.setActiveChannelId);
+
+  // Synchronize state from useUIStore to useChatStore
+  useEffect(() => {
+    if (uiActiveChannelId !== activeChannelId) {
+      setActiveChannelId(uiActiveChannelId);
+    }
+  }, [uiActiveChannelId]);
+
+  // Synchronize state from useChatStore to useUIStore
+  useEffect(() => {
+    if (activeChannelId !== uiActiveChannelId) {
+      setUiActiveChannelId(activeChannelId);
+    }
+  }, [activeChannelId]);
 
   // Modal open states
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -62,7 +80,7 @@ export const ChatPage: React.FC = () => {
       const deletedId = (e as CustomEvent).detail;
       removeChannel(deletedId);
       fetchChannelsList();
-      setActiveChannelId("general");
+      setActiveChannelId(null);
     };
 
     window.addEventListener("ww:open-create-group", handleOpenCreateGroup);

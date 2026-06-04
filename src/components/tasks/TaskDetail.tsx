@@ -1,12 +1,44 @@
-import React, { useState } from "react";
-import { useTaskDetails, useTaskMutations } from "../../hooks/useTasks";
+import React, { useState, useRef, useEffect } from "react";
+import { useTaskDetails, useTaskMutations, useEligibleAssignees } from "../../hooks/useTasks";
 import { useUIStore } from "../../stores/uiStore";
-import { X, Clock, MessageSquare, AlertCircle, Plus, Calendar, Bookmark, Send } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { X, Clock, MessageSquare, AlertCircle, Plus, Calendar, Bookmark, Send, Check, User } from "lucide-react";
 
 export const TaskDetail: React.FC = () => {
   const { selectedTaskId, setSelectedTaskId } = useUIStore();
+  const queryClient = useQueryClient();
   const { data: task, isLoading, refetch } = useTaskDetails(selectedTaskId);
-  const { updateTask, addComment, logTime } = useTaskMutations();
+  const { data: eligibleUsers = [] } = useEligibleAssignees(selectedTaskId);
+  const { updateTask, addComment, logTime, toggleAssignee } = useTaskMutations();
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowAssigneeDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const currentAssigneeIds = task?.assignees?.map((a: any) => (a.user?.id || a.id || a.userId)) || [];
+  
+  const filteredUsers = eligibleUsers.filter((u: any) =>
+    u.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleToggleAssignee = (userId: string, isAssigned: boolean) => {
+    if (!selectedTaskId) return;
+    toggleAssignee.mutate({ taskId: selectedTaskId, userId, isAssigned });
+  };
 
   const [commentText, setCommentText] = useState("");
   const [timeDescription, setTimeDescription] = useState("");
@@ -64,6 +96,15 @@ export const TaskDetail: React.FC = () => {
     });
   };
 
+  const getFormattedDate = (dateStr?: string) => {
+    if (!dateStr) return "";
+    try {
+      return new Date(dateStr).toISOString().split("T")[0];
+    } catch (e) {
+      return "";
+    }
+  };
+
   if (!selectedTaskId) return null;
 
   return (
@@ -110,7 +151,7 @@ export const TaskDetail: React.FC = () => {
           </div>
 
           {/* Properties grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", paddingBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", paddingBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <span style={{ fontSize: "11px", textTransform: "uppercase", color: "hsl(var(--text-muted-hsl))" }}>Priority</span>
               <select
@@ -129,10 +170,219 @@ export const TaskDetail: React.FC = () => {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <span style={{ fontSize: "11px", textTransform: "uppercase", color: "hsl(var(--text-muted-hsl))" }}>Due Date</span>
-              <div className="input-field" style={{ display: "flex", alignItems: "center", gap: "8px", height: "34px", background: "rgba(0,0,0,0.2)", fontSize: "13px", color: "hsl(var(--text-secondary-hsl))" }}>
-                <Calendar size={14} />
-                <span>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No Date Assigned"}</span>
+              <div style={{ position: "relative", width: "100%", height: "34px" }}>
+                {/* Hidden native date input */}
+                <input
+                  type="date"
+                  ref={dateInputRef}
+                  value={getFormattedDate(task.dueDate)}
+                  onChange={(e) => {
+                    if (!selectedTaskId) return;
+                    updateTask.mutate({ taskId: selectedTaskId, updateData: { dueDate: e.target.value ? new Date(e.target.value).toISOString() : null } });
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "0px",
+                    height: "0px",
+                    visibility: "hidden"
+                  }}
+                />
+                
+                {/* Custom Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      dateInputRef.current?.showPicker();
+                    } catch (err) {
+                      dateInputRef.current?.focus();
+                    }
+                  }}
+                  className="input-field"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "8px", 
+                    background: "rgba(0,0,0,0.2)", 
+                    fontSize: "13px", 
+                    color: "hsl(var(--text-secondary-hsl))",
+                    border: "1px solid hsl(var(--border-hsl))",
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  <Calendar size={14} style={{ color: "hsl(var(--text-muted-hsl))" }} />
+                  <span>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No Date Assigned"}</span>
+                </button>
               </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", position: "relative" }}>
+              <span style={{ fontSize: "11px", textTransform: "uppercase", color: "hsl(var(--text-muted-hsl))" }}>Assignee</span>
+              <button
+                type="button"
+                onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                className="input-field"
+                style={{
+                  height: "34px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "rgba(0,0,0,0.2)",
+                  fontSize: "13px",
+                  color: "hsl(var(--text-secondary-hsl))",
+                  border: "1px solid hsl(var(--border-hsl))",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  justifyContent: "flex-start",
+                  padding: "0 10px"
+                }}
+              >
+                {task.assignees && task.assignees.length > 0 ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "-6px" }}>
+                    {task.assignees.slice(0, 2).map((a: any, idx: number) => {
+                      const u = a.user || a;
+                      return (
+                        <div
+                          key={u.id || idx}
+                          style={{
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "50%",
+                            background: "hsl(var(--primary-hsl))",
+                            border: "1px solid #1e2030",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "8.5px",
+                            fontWeight: "700",
+                            color: "white",
+                            marginLeft: idx > 0 ? "-6px" : "0",
+                          }}
+                        >
+                          {u.fullName?.charAt(0).toUpperCase() || "?"}
+                        </div>
+                      );
+                    })}
+                    {task.assignees.length > 2 ? (
+                      <span style={{ fontSize: "11px", marginLeft: "2px" }}>+{task.assignees.length - 2}</span>
+                    ) : (
+                      <span style={{ fontSize: "12px", marginLeft: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {(task.assignees[0].user || task.assignees[0]).fullName?.split(" ")[0]}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <User size={13} style={{ color: "hsl(var(--text-muted-hsl))" }} />
+                    <span>Assign</span>
+                  </>
+                )}
+              </button>
+
+              {/* Assignee Dropdown Popover */}
+              {showAssigneeDropdown && (
+                <div
+                  ref={dropdownRef}
+                  style={{
+                    position: "absolute",
+                    top: "38px",
+                    right: 0,
+                    width: "220px",
+                    background: "#161823",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: "8px",
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                    zIndex: 200,
+                    padding: "8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px"
+                  }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Search people..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{
+                      background: "rgba(0,0,0,0.25)",
+                      border: "1px solid hsl(var(--border-hsl))",
+                      borderRadius: "4px",
+                      padding: "4px 8px",
+                      fontSize: "12px",
+                      color: "white",
+                      outline: "none"
+                    }}
+                  />
+                  <div 
+                    style={{ 
+                      maxHeight: "150px", 
+                      overflowY: "auto", 
+                      display: "flex", 
+                      flexDirection: "column", 
+                      gap: "2px" 
+                    }}
+                  >
+                    {filteredUsers.length === 0 ? (
+                      <span style={{ fontSize: "11px", color: "hsl(var(--text-muted-hsl))", padding: "6px 8px", textAlign: "center" }}>
+                        No eligible users found
+                      </span>
+                    ) : (
+                      filteredUsers.map((u: any) => {
+                        const isAssigned = currentAssigneeIds.includes(u.id);
+                        return (
+                          <div
+                            key={u.id}
+                            onClick={() => handleToggleAssignee(u.id, isAssigned)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "6px 8px",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              background: isAssigned ? "rgba(255,255,255,0.03)" : "transparent",
+                              transition: "all 0.15s ease"
+                            }}
+                            onMouseEnter={(e) => { if (!isAssigned) e.currentTarget.style.background = "rgba(255,255,255,0.015)"; }}
+                            onMouseLeave={(e) => { if (!isAssigned) e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden" }}>
+                              <div style={{ 
+                                width: "20px", 
+                                height: "20px", 
+                                borderRadius: "50%", 
+                                background: "hsl(var(--primary-hsl))", 
+                                display: "flex", 
+                                alignItems: "center", 
+                                justifyContent: "center", 
+                                fontSize: "9px", 
+                                fontWeight: "700", 
+                                color: "white",
+                                flexShrink: 0
+                              }}>
+                                {u.fullName?.charAt(0).toUpperCase()}
+                              </div>
+                              <span style={{ fontSize: "12.5px", color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {u.fullName}
+                              </span>
+                            </div>
+                            {isAssigned && <Check size={13} style={{ color: "hsl(var(--primary-light-hsl))" }} />}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
